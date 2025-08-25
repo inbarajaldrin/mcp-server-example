@@ -1,0 +1,51 @@
+{
+    "mcpServers": {
+      "weather": {
+        "command": "uv",
+        "args": [
+          "--directory",
+          "/Users/aldrininbaraj/Documents/Projects/mcp/hello_world/",
+          "run",
+          "weather.py"
+        ]
+      },
+      "Prompts": {
+        "command": "/opt/homebrew/bin/uv",
+        "args": [
+          "run",
+          "--with",
+          "mcp[cli]",
+          "mcp",
+          "run",
+          "/Users/aldrininbaraj/Documents/Projects/mcp/hello_world/prompt.py"
+        ]
+      },
+      "Resources": {
+        "command": "/opt/homebrew/bin/uv",
+        "args": [
+          "run",
+          "--with",
+          "mcp[cli]",
+          "mcp",
+          "run",
+          "/Users/aldrininbaraj/Documents/Projects/mcp/hello_world/resource.py"
+        ]
+      },
+      "mcp_deploy": {
+        "command": "uvx",
+        "args": [
+          "--from",
+          "git+https://github.com/inbarajaldrin/mcp-server-example.git",
+          "mcp-server"
+        ]
+      },
+      "remote-example": {
+        "command": "npx",
+        "args": [
+          "mcp-remote",
+          "http://127.0.0.1:8000/mcp/",
+          "--allow-http"
+        ]
+      }
+    }
+  }
