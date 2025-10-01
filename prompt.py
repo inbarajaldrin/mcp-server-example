@@ -77,15 +77,27 @@ PROMPTS = {
      ),
      "stack": (
          "## Stack Operation for Jenga Blocks\n"
-         "Step 1: Move UR end effector to pick station position {pick_station} to scan Jenga blocks available for picking.\n"
-         "Step 2: Get ROS2 topics and read topic info of one Jenga block to pick up from the real world.\n"
-         "Step 3: use visual_servo_pick mcp tool to move ee to pick the jenga block.\n"
-         "Step 4: Close gripper to grasp the Jenga block.\n"
-         "Step 5: ros2 topic echo /gripper_grasp_detected and check if its true. if the grasp was not detected, Go 5 cm up to get updated position of jenga . Try sending the open gripper once and then close grippercommand till /gripper_grasp_detected says true.\n"         
-         "Step 6: Move UR end effector to final pose: {final_x}, {final_y}, 0.25 (drop position), 0,180,0.\n"
-         "Step 7: Run move_down mcp tool. \n"
-         "Step 8: Return to pick station and repeat the process for all remaining Jenga blocks.\n"
-         "Step 9 : move HOME_POSE = [0.065, -0.385, 0.481, 0, 180, 0] after there are no objects in the pick station \n"
+        "Step 1: Move UR end effector to pick station position {pick_station} to scan Jenga blocks available for picking.\n"
+        "Step 2: Get ROS2 topics to check available Jenga blocks and confirm if objects are still there or if new objects have been added.\n"
+        "Step 3: Keep track of objects already stacked and select one Jenga block topic name that has NOT been stacked yet.\n"
+        "Step 4: use visual_servo_pick mcp tool to move ee to pick the jenga block.\n"
+         "Step 5: Close gripper to grasp the Jenga block.\n"
+         "Step 6: Check gripper width using 'ros2 topic echo /gripper_width --once' to verify grasp success:\n"
+        "        - If width is around 32.7 (successful grasp with Jenga block), continue to Step 7\n"
+        "        - If width is around 110 (gripper still open), send close gripper command again and repeat Step 6\n"
+        "        - If width is around 9 (closed without Jenga block), go back to pick station position and perform visual servo again, then repeat from Step 4\n"         
+         "Step 7: Move UR end effector to final pose: {final_x}, {final_y}, 0.25 (drop position), 0,180,0.\n"
+         "Step 8: Run move_down mcp tool. \n"
+         "Step 9: Open gripper to release the Jenga block.\n"
+         "Step 10: Check gripper width using 'ros2 topic echo /gripper_width --once' to confirm successful release:\n"
+        "        - If width is around 110 (gripper opened successfully), continue to Step 11\n"
+        "        - If width is not around 110, send open gripper command again and repeat Step 10\n"
+         "Step 11: Mark the successfully stacked Jenga block as completed in the tracking list.\n"
+         "Step 12: Return to pick station and repeat the process for all remaining Jenga blocks.\n"
+         "Step 13: move HOME_POSE = [0.065, -0.385, 0.481, 0, 180, 0] after there are no objects in the pick station \n"
+     ),
+     "detect_prompt_free": (
+         "can you read prompt free detection. note that the annotations are labeled wrong. so map what you actually see in the original image to the wrongly labelled prompts and then update yolo prompt with objects of interest (objects to grasp with a robotic arm and box/hand to place it one)"
      )
 }
 
@@ -228,7 +240,7 @@ def stack_jenga_blocks(pick_station: str = None, final_x: float = None, final_y:
     """
     # Default values if not provided
     if pick_station is None:
-        pick_station = "[-0.361, -0.385, 0.481, 0, 180, 0]"
+        pick_station = "[-0.180, -0.385, 0.350, 0, 180, 0]"
     
     if final_x is None:
         final_x = 0.0
@@ -245,6 +257,27 @@ def stack_jenga_blocks(pick_station: str = None, final_x: float = None, final_y:
         final_y=final_y,
         jenga_orientation=jenga_orientation
     )
+
+
+@mcp.prompt()
+def detect_prompt_free() -> str:
+    """
+    Returns a prompt for performing prompt-free object detection and analysis.
+    This function implements a workflow that:
+    1. Captures camera images from the scene
+    2. Analyzes the image to identify all visible objects without relying on pre-labeled annotations
+    3. Maps actual visual content to correct labels, ignoring incorrect pre-existing annotations
+    4. Creates a corrected object inventory based on actual visual analysis
+    5. Identifies available objects for manipulation vs. already processed objects
+    6. Provides accurate scene state description based on visual analysis
+    
+    This is particularly useful when working with images that have incorrect or misleading annotations,
+    as it relies purely on visual analysis rather than assumed labels.
+    
+    Returns:
+        str: The prompt for prompt-free detection operations
+    """
+    return PROMPTS["detect_prompt_free"]
 
 
 if __name__ == "__main__":
