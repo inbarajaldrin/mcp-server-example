@@ -85,7 +85,7 @@ PROMPTS = {
          "Step 6: Check gripper width using 'ros2 topic echo /gripper_width --once' to verify grasp success:\n"
         "        - If width is around 32.7 (successful grasp with Jenga block), continue to Step 7\n"
         "        - If width is around 110 (gripper still open), send close gripper command again and repeat Step 6\n"
-        "        - If width is around 9 (closed without Jenga block), go back to pick station position and perform visual servo again, then repeat from Step 4\n"         
+        "        - If width is around 9 (closed without Jenga block), go back to pick station position and perform visual servo again, then repeat from Step 4\n"
          "Step 7: Move UR end effector to final pose: {final_x}, {final_y}, 0.25 (drop position), 0,180,0.\n"
          "Step 8: Run move_down mcp tool. \n"
          "Step 9: Open gripper to release the Jenga block.\n"
@@ -97,7 +97,55 @@ PROMPTS = {
          "Step 13: move HOME_POSE = [0.065, -0.385, 0.481, 0, 180, 0] after there are no objects in the pick station \n"
      ),
      "detect_prompt_free": (
-         "can you read prompt free detection. note that the annotations are labeled wrong. so map what you actually see in the original image to the wrongly labelled prompts and then update yolo prompt with objects of interest (objects to grasp with a robotic arm and box/hand to place it one)"
+         "can you read prompt free detection. note that the annotations are labeled wrong. \n"
+         "so map what you actually see in the original image to the wrongly labelled prompts \n"
+         "and then update yolo prompt with objects of interest \n"
+         "(objects to grasp with a robotic arm and box/hand to place the object on) \n"
+         "if you see a gripper labeled as chair, then don't add it to the yolo prompt."
+     ),
+     "poses": (
+         "HOME_POSE = [0.065, -0.385, 0.481, 0, 180, 0]  # XYZRPY\n"
+         "PICK_STATION_POSE = [-0.180, -0.385, 0.481, 0, 180, 0]  # XYZRPY"
+     ),
+     "yoloe_demo": (
+         "peform these steps for a pick and place operation using yoloe\n\n"
+         "step 1\n\n"
+         "the robot is at home position now\n\n"
+         "perform detect \"prompt free instructions txt file\n\n"
+         "if you see a gripper labeled as chair, then don't add it to the yolo prompt.\n\n"
+         "if you see anything lablled studio or studio shot, then don't add it to the yolo prompt.\n\n"
+         "<user instructions will be provided>\n\n"
+         "step 2\n\n"
+         "read_topic of /objects_poses to know the name of the object as defined in the topic. \n\n"
+         "if there are two instances of one object, then ask which one are we talking about before performing the next step\n\n"
+         "note down the  object name and position and orientation in quaternion format\n\n"
+         "note down the drop position and orientation in quaternion format.\n\n"
+         "if you dont see the object to grasp or the drop location, then read object pose topic again.\n\n"
+         "if the object is not listed in the object pose topic, then run detect prompt free again.\n\n"
+         "add prompt maps of all objects in the scene to the yolo prompt so wrong objects are not detected.\n\n"
+         "step 3\n\n"
+         "visual servo to the object using visual_servo_yoloe mcp tool\n\n"
+         "step 4\n\n"
+         "close gripper using control_gripper\n\n"
+         "verify_grasp\n\n"
+         "if verify gripper returned that the gripper didnt close (could be due to gripper communication problems), then close the gripper again till the verification works.\n\n"
+         "perform control_gripper based on verify_grasp\n\n"
+         "if the gripper closed without grasping the object, go back home and read object pose topic again and perform visual servo again and close the gripper again till the verification works.\n\n"
+         "step 5\n\n"
+         "move_to_safe_height with height of 0.481\n\n"
+         "run the tool again if it didnt work the first time.\n\n"
+         "step 6\n\n"
+         "the pose of the box will not be visible in the image, so use the position and orientation in quaternion detected for target x,y,z and target x,y,z,w\n\n"
+         "move_down with height of 0.22\n\n"
+         "try move_down tool again if it didnt work the first time.\n\n"
+         "if you are told to perform a stack, use the pose of the target object from earlier but keep the z height of 0.15\n\n"
+         "step 7\n\n"
+         "open gripper using control_gripper\n\n"
+         "verify_grasp\n\n"
+         "if the gripper didnt open, keep trying to open the gripper till it opens.\n\n"
+         "step 8\n\n"
+         "go home\n"
+         "HOME_POSE = [0.065, -0.385, 0.481, 0, 180, 0]  # XYZRPY\n\n"
      )
 }
 
@@ -142,7 +190,7 @@ def hover_over_jenga_block() -> str:
     """
     Returns a prompt for positioning the UR robot's end effector to hover over a jenga block.
     This function will:
-    1close. List available topics/prims and select one jenga block
+    1. List available topics/prims and select one jenga block
     2. Read the selected block's pose (position and orientation)
     3. Position the UR end effector above the block at z=0.25
     4. Calculate and apply the correct end effector orientation for picking
@@ -278,6 +326,41 @@ def detect_prompt_free() -> str:
         str: The prompt for prompt-free detection operations
     """
     return PROMPTS["detect_prompt_free"]
+
+
+@mcp.prompt()
+def get_poses() -> str:
+    """
+    Returns the predefined poses for robot operations.
+    This function provides the standard home and pick station poses used in robotic operations.
+    
+    Returns:
+        str: The poses with HOME_POSE and PICK_STATION_POSE coordinates
+    """
+    return PROMPTS["poses"]
+
+
+@mcp.prompt()
+def yoloe_demo(user_instructions: str = "<user instructions will be provided>") -> str:
+    """
+    Returns a prompt for performing pick and place operations using YOLOe.
+    This function implements a complete workflow that:
+    1. Starts from home position and performs prompt-free detection
+    2. Reads object poses from /objects_poses topic
+    3. Handles multiple instances of objects by asking for clarification
+    4. Moves to drop station and identifies drop location
+    5. Performs visual servo operations using YOLOe
+    6. Handles gripper control with grasp verification
+    7. Adapts placement strategy based on drop location type (hand vs box)
+    8. Returns to home position after completion
+    
+    Args:
+        user_instructions: User-provided instructions for the operation (default: placeholder)
+    
+    Returns:
+        str: The comprehensive prompt for YOLOe pick and place operations
+    """
+    return PROMPTS["yoloe_demo"].replace("<user instructions will be provided>", user_instructions)
 
 
 if __name__ == "__main__":
