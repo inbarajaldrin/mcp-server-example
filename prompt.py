@@ -132,7 +132,7 @@ PROMPTS = {
          "perform control_gripper based on verify_grasp\n\n"
          "if the gripper closed without grasping the object, go back home and read object pose topic again and perform visual servo again and close the gripper again till the verification works.\n\n"
          "step 5\n\n"
-         "move_to_safe_height with height of 0.481\n\n"
+         "move to home position\n\n"
          "run the tool again if it didnt work the first time.\n\n"
          "step 6\n\n"
          "the pose of the box will not be visible in the image, so use the position and orientation in quaternion detected for target x,y,z and target x,y,z,w\n\n"

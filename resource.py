@@ -2,7 +2,6 @@ from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP("Resources")
 
-#Resource
 @mcp.resource("inventory://overview")
 def get_inventory_overview() -> str:
     """
@@ -29,7 +28,6 @@ inventory_name_to_id = {
     "Cookies": "789"
 }
 
-#Resource template 
 @mcp.resource("inventory://{inventory_id}/price")
 def get_inventory_price_from_inventory_id(inventory_id: str) -> str:
     """
