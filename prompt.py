@@ -179,6 +179,38 @@ PROMPTS = {
          "HOME_POSE = [0.065, -0.385, 0.481, 0, 180, 0]  # XYZRPY\n\n"
          "Open gripper using control_gripper"
      ),
+    "recreate_fmb_assembly_dt": (
+        "## Recreate FMB Assembly Operation\n"
+        "Note: dont go to home unnecessarily\n"
+        "\n"
+        "Step 1: Read /objects_poses_sim topic to get the names of the objects we are dealing with\n"
+        "\n"
+        "Step 2: Read final assembly steps information and look at the assembly instruction manual images to figure out the assembly tree structure.\n"
+        "\n"
+        "Step 3: Play scene and restore scene if previous assembly has been completed. Pick the next object to grasp.\n"
+        "\n"
+        "Step 4: Perform the following to pick and place each object to recreate the final assembly:\n"
+        "   - Once you have selected the next object to assemble onto the base, note down its position and rotation and then perform ik (read object pose always for perform ik and set ee pose to 0,180,0) to move above the object with z = 0.3\n"
+        "   - You can only take a screenshot if the arm is above the object.Take a screenshot of the /annotated_stream image topic to see the grasp points available for the selected object. You can also read the position of the grasp point from /grasp_points topic\n"
+        "   - Pick a grasp id by analysing the instruction manual images, screenshot and previous history of failed attempts and Move to grasp\n"
+        "   - Close gripper to pick up object\n"
+        "   - Verify grasp: if the gripper didnt close properly, take a photo using the intel_camera_rgb_sim topic. If you can confirm the grasp failed, this is a failed attempt. Log the failed attempt using log_grasp_attempt tool, then reset: Move home first to reset robot position, stop and start the scene in Isaacsim, and restore scene state to the previous state before the current object was manipulated. Pick a different grasp id and repeat from the beginning.\n"
+        "   - if the gripper closed properly, move to safe height\n"
+        "   - Reorient for assembly (relative to base)\n"
+        "   - Read objects_poses_sim topic again to verify if the object has been grabbed properly and reoriented.\n"
+        "   - Verify reorientation: If the object is not where it was supposed to be or has moved incorrectly, then the selected grasp id is not correct. Log the failed attempt using log_grasp_attempt tool, then reset: Move home first to reset robot position, stop and start the scene in Isaacsim, and restore scene state to the previous state before the current object was manipulated. Pick a different grasp id and repeat from the beginning.\n"
+        "   - If the object has moved more than 85 degrees in any axis, then perform Move down, open gripper, move to grasp the id again, close gripper and move to safe height.\n"
+        "   - Perform translate_for_assembly relative to the base.\n"
+        "   - Open gripper to release object\n"
+        "   - Move to safe height\n"
+        "   - Run verify final position of object.\n"
+        "   - If the object is where its supposed to be then save scene state using save_scene_state tool by passing the names of the objects whose assembly into the base is already done including base name. Log the successful attempt using log_grasp_attempt tool with status 'success'.\n"
+        "   - If the object is not where it was supposed to be, then the selected grasp id is not correct. Log the failed attempt using log_grasp_attempt tool, then reset: Move home first to reset robot position, stop and start the scene in Isaacsim, and restore scene state to the previous state before the current object was manipulated. Pick a different grasp id and repeat from the beginning.\n"
+        "\n"
+        "Step 5: once you find out that a selected grasp point works, update the fmb_assembly_steps.json file.\n"
+        "\n"
+        "Step 6: Repeat the process for the next object in the assembly tree.\n"
+    ),
 }
 
 
@@ -360,6 +392,32 @@ def recreate_real_world_jenga() -> str:
         str: The comprehensive prompt for real-world Jenga recreation operations
     """
     return PROMPTS["recreate_real_world_jenga"]
+
+
+@mcp.prompt()
+def recreate_fmb_assembly_dt() -> str:
+    """
+    Returns a prompt for recreating FMB (Final Model Build) assembly operations in the digital twin.
+    This function implements a complete workflow that:
+    1. Lists prims in Isaac Sim to identify available objects
+    2. Reads final assembly pose information and analyzes assembly instruction manual images
+    3. Creates an assembly tree structure and writes it to fmb_assembly_steps.json
+    4. Performs pick and place operations for each object in the assembly tree:
+       - Reads object poses from objects_poses_sim topic
+       - Moves above objects and captures annotated images to identify grasp points
+       - Selects and tests grasp IDs iteratively
+       - Reorients objects relative to the base
+       - Translates objects to final assembly positions
+       - Verifies final positions and updates the JSON file with successful grasp IDs
+    5. Repeats the process for all objects in the assembly tree
+    
+    This operation systematically explores and validates grasp points to ensure successful
+    assembly recreation, updating the assembly steps file as valid grasp configurations are found.
+    
+    Returns:
+        str: The comprehensive prompt for FMB assembly recreation operations
+    """
+    return PROMPTS["recreate_fmb_assembly_dt"]
 
 
 if __name__ == "__main__":
