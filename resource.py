@@ -331,10 +331,10 @@ def update_fmb_assembly_steps_file(assembly_data: str) -> str:
         {
             "object_name": "Object1",
             "status": "success",
-            "grasp_id": 0,
+            "grasp_id": 2,
             "grasp_attempts": [
-                {"grasp_id": 0, "status": "success"},
-                {"grasp_id": 1, "status": "failure"}
+                {"grasp_id": 1, "status": "failure"},
+                {"grasp_id": 2, "status": "success"}
             ]
         },
         {
@@ -342,7 +342,7 @@ def update_fmb_assembly_steps_file(assembly_data: str) -> str:
             "status": "in_progress",
             "grasp_id": null,
             "grasp_attempts": [
-                {"grasp_id": 0, "status": "failure"}
+                {"grasp_id": 1, "status": "failure"}
             ]
         }
     ]
@@ -627,6 +627,89 @@ def log_grasp_attempt(object_name: str, grasp_id: int, attempt_status: str) -> s
         return json.dumps({
             "success": False,
             "error": f"Failed to log grasp attempt: {str(e)}"
+        }, indent=2)
+
+@mcp.tool()
+def reset_fmb_assembly_steps(reset_type: str = "all") -> str:
+    """
+    Reset the FMB assembly steps file. Can reset all objects to pending status with empty grasp attempts,
+    or completely clear the file.
+    
+    Args:
+        reset_type: Type of reset to perform:
+            - "all": Reset all objects to pending status with empty grasp_attempts (keeps object names)
+            - "clear": Clear the file completely (empty array)
+    
+    Returns:
+        JSON string with confirmation or error message
+    """
+    try:
+        if reset_type not in ["all", "clear"]:
+            return json.dumps({
+                "success": False,
+                "error": "Invalid reset_type. Must be 'all' or 'clear'."
+            }, indent=2)
+        
+        # Ensure data directory exists
+        FMB_ASSEMBLY_STEPS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        
+        if reset_type == "clear":
+            # Clear the file completely
+            with open(FMB_ASSEMBLY_STEPS_FILE, 'w') as f:
+                json.dump([], f, indent=2)
+            
+            return json.dumps({
+                "success": True,
+                "message": "FMB assembly steps file cleared completely",
+                "reset_type": "clear"
+            }, indent=2)
+        
+        else:  # reset_type == "all"
+            # Read current file
+            if not FMB_ASSEMBLY_STEPS_FILE.exists():
+                return json.dumps({
+                    "success": False,
+                    "error": "FMB assembly steps file does not exist. Nothing to reset."
+                }, indent=2)
+            
+            with open(FMB_ASSEMBLY_STEPS_FILE, 'r') as f:
+                data = json.load(f)
+            
+            if not isinstance(data, list):
+                return json.dumps({
+                    "success": False,
+                    "error": "Invalid file format. Expected a list."
+                }, indent=2)
+            
+            # Reset all objects to pending status with empty grasp attempts
+            reset_count = 0
+            for step in data:
+                if isinstance(step, dict) and "object_name" in step:
+                    step["status"] = "pending"
+                    step["grasp_id"] = None
+                    step["grasp_attempts"] = []
+                    reset_count += 1
+            
+            # Write back to file
+            with open(FMB_ASSEMBLY_STEPS_FILE, 'w') as f:
+                json.dump(data, f, indent=2)
+            
+            return json.dumps({
+                "success": True,
+                "message": f"Reset {reset_count} objects to pending status with empty grasp attempts",
+                "reset_type": "all",
+                "objects_reset": reset_count
+            }, indent=2)
+        
+    except json.JSONDecodeError as e:
+        return json.dumps({
+            "success": False,
+            "error": f"Invalid JSON in file: {str(e)}"
+        }, indent=2)
+    except Exception as e:
+        return json.dumps({
+            "success": False,
+            "error": f"Failed to reset file: {str(e)}"
         }, indent=2)
 
 
